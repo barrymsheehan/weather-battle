@@ -6,13 +6,14 @@ import sys
 METEO_GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
 METEO_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 CITY_1 = "Cork"
+CITY_2 = "Oxford"
 
 # Today's date
 now = dt.datetime.now()
 today = now.strftime("%Y-%m-%d")
 
-def get_geolocation(city: str) -> dict:
-    """Return latitude and longitude for city"""
+def get_coords_for_city(city: str) -> dict:
+    """Return coords (latitude and longitude) for city"""
 
     try:
 
@@ -36,7 +37,7 @@ def get_geolocation(city: str) -> dict:
         }
 
     except req.exceptions.RequestException as e:
-        print(f"ERROR: Request failed while fetching geolocation data {e}")
+        print(f"ERROR: Request failed while fetching coords {e}")
         sys.exit(1)
     
     except ValueError as e:
@@ -44,21 +45,21 @@ def get_geolocation(city: str) -> dict:
         sys.exit(1)
     
     except KeyError as e:
-        print(f"ERROR: key {e} not found in geolocation response")
+        print(f"ERROR: key {e} not found in coords response")
         sys.exit(1)
 
     except Exception as e:
-        print(f"ERROR: Unexpected error in get_geolocation() {e}")
+        print(f"ERROR: Unexpected error in get_coords_for_city() {e}")
         sys.exit(1)
 
-def get_weather(location: dict) -> dict:
-    """Return specific hourly weather data for location"""
+def get_weather_for_coords(coords: dict) -> dict:
+    """Return hourly weather data for coords"""
 
     try:
 
         weather_params = {
-            "latitude": location["latitude"],
-            "longitude": location["longitude"],
+            "latitude": coords["latitude"],
+            "longitude": coords["longitude"],
             "hourly": "temperature_2m,apparent_temperature,rain",
             "timezone": "GMT",
             "start_date": today,
@@ -67,6 +68,8 @@ def get_weather(location: dict) -> dict:
 
         print(f"About to run query: {METEO_WEATHER_URL}?{urlencode(weather_params)}")
         res_weather = req.get(METEO_WEATHER_URL, params=weather_params)
+        res_weather.raise_for_status()
+
         weather_data = res_weather.json()
 
         # These are the features we want from the returned weather data
@@ -106,20 +109,39 @@ def get_weather(location: dict) -> dict:
         print(f"ERROR: Index not found in weather response {e}")
 
     except Exception as e:
-        print(f"ERROR: Unexpected error in get_weather() {e}")
+        print(f"ERROR: Unexpected error in get_weather_for_coords() {e}")
         sys.exit(1)
 
+def get_weather_for_city(city: str) -> dict:
+    """
+    Return weather data for city
+    1. Get coordinates (latitude, longitude) for city
+    2. Get hourly weather data for today for these coordinates
+    """
+
+    coords = get_coords_for_city(city)
+
+    print(f"Latitude: {coords['latitude']}, longitude: {coords['longitude']}")
+
+    return get_weather_for_coords(coords)
+
+
 def main():
-    """Main function, fetches geolocation data then weather data"""
+    """Main function, fetches coords, then weather data for both cities"""
 
     try:
-        city_location = get_geolocation(CITY_1)
-        print(f"{CITY_1} location: {city_location}")
+        city_1_weather = get_weather_for_city(CITY_1)
+        city_2_weather = get_weather_for_city(CITY_2)
 
-        weather_data = get_weather(city_location)
-        print(f"Highest real feel of the day: {weather_data['max_temp']} (real feel {weather_data['max_real_feel']}) at {weather_data['max_time']}")
-        print(f"Lowest real feel of the day: {weather_data['min_temp']} (real feel {weather_data['min_real_feel']}) at {weather_data['min_time']}")
-        print(f"Highest rainfall of the day: {weather_data['max_rain']} at {weather_data["rain_time"]}")
+        print(f"{CITY_1} stats")
+        print(f"Highest real feel of the day: {city_1_weather['max_temp']} (real feel {city_1_weather['max_real_feel']}) at {city_1_weather['max_time']}")
+        print(f"Lowest real feel of the day: {city_1_weather['min_temp']} (real feel {city_1_weather['min_real_feel']}) at {city_1_weather['min_time']}")
+        print(f"Highest rainfall of the day: {city_1_weather['max_rain']} at {city_1_weather["rain_time"]}")
+
+        print(f"{CITY_2} stats")
+        print(f"Highest real feel of the day: {city_2_weather['max_temp']} (real feel {city_2_weather['max_real_feel']}) at {city_2_weather['max_time']}")
+        print(f"Lowest real feel of the day: {city_2_weather['min_temp']} (real feel {city_2_weather['min_real_feel']}) at {city_2_weather['min_time']}")
+        print(f"Highest rainfall of the day: {city_2_weather['max_rain']} at {city_2_weather["rain_time"]}")
 
     except KeyError as e:
         print(f"Error: Key {e} not found in weather response")
