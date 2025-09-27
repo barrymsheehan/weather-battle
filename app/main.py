@@ -2,16 +2,35 @@ import requests as req
 from urllib.parse import urlencode
 import datetime as dt
 import sys
+import json
 
 METEO_GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
 METEO_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
-CITY_1 = "Cork"
-CITY_2 = "Oxford"
 DEGREE = chr(176) # degree symbol
+
+config = {}
 
 # Today's date
 now = dt.datetime.now()
 today = now.strftime("%Y-%m-%d")
+
+def load_config() -> dict:
+    global config
+
+    try:
+        with open("../config.json", "r") as file:
+            config = json.load(file)
+
+    except FileNotFoundError as e:
+        print(f"ERROR: Config file not found {e}")
+        sys.exit(1)
+
+    except OSError as e:
+        print(f"ERROR: OS error while reading config file {e}")
+        sys.exit(1)
+
+    except Exception as e:
+        print(f"ERROR: Unexpected error while loading config file {e}")
 
 def get_coords_for_city(city: str) -> dict:
     """Return coords (latitude and longitude) for city"""
@@ -133,21 +152,18 @@ def compare_weather(city_1: dict, city_2: dict) -> tuple:
     return 1 if city_1 wins, 2 if city_2 wins and 0 for a tie
     """
 
-    # 20+ is hot
-    if city_1["max_real_feel"] >= 20 or city_2["max_real_feel"] >= 20:
+    if city_1["max_real_feel"] >= config["thresholds"]["hot"] or city_2["max_real_feel"] >= config["thresholds"]["hot"]:
         if city_1["max_real_feel"] > city_2["max_real_feel"]:
             return (city_1["name"], "max_real_feel")
         elif city_2["max_real_feel"] > city_1["max_real_feel"]:
             return (city_2["name"], "max_real_feel")
 
-    # 10- is cold
-    if city_1["min_real_feel"] <= 10 or city_2["min_real_feel"] <= 10:
+    if city_1["min_real_feel"] <= config["thresholds"]["cold"] or city_2["min_real_feel"] <= config["thresholds"]["cold"]:
         if city_1["min_real_feel"] < city_2["min_real_feel"]:
             return (city_1["name"], "min_real_feel")
         elif city_2["min_real_feel"] < city_1["min_real_feel"]:
             return (city_2["name"], "min_real_feel")
 
-    # Use rain as a tie breaker
     if city_1["max_rain"] > 0 or city_1["max_rain"] > 0:
         if city_1["max_rain"] > city_2["max_rain"]:
             return (city_1["name"], "max_rain")
@@ -175,16 +191,18 @@ def create_result_string(city_1: dict, city_2: dict, winning_city: tuple) -> str
 def main():
     """Main function, fetches coords, then weather data for both cities"""
 
+    load_config()
+
     try:
-        city_1_weather = get_weather_for_city(CITY_1)
-        city_2_weather = get_weather_for_city(CITY_2)
+        city_1_weather = get_weather_for_city(config["cities"]["city_1"])
+        city_2_weather = get_weather_for_city(config["cities"]["city_2"])
         winner = compare_weather(city_1_weather, city_2_weather)
         result = create_result_string (city_1_weather, city_2_weather, winner)
 
         print(result)
 
     except KeyError as e:
-        print(f"Error: Key {e} not found in weather response")
+        print(f"ERROR: Key {e} not found in weather response")
         sys.exit(1)
     
     except Exception as e:

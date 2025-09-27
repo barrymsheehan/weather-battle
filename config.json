@@ -1,0 +1,10 @@
+{
+    "cities": {
+        "city_1": "Cork",
+        "city_2": "Oxford"
+    },
+    "thresholds": {
+        "hot": 20,
+        "cold": 10
+    }
+}
