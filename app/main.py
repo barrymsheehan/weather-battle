@@ -7,6 +7,7 @@ METEO_GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
 METEO_WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 CITY_1 = "Cork"
 CITY_2 = "Oxford"
+DEGREE = chr(176) # degree symbol
 
 # Today's date
 now = dt.datetime.now()
@@ -26,14 +27,14 @@ def get_coords_for_city(city: str) -> dict:
 
         print(f"About to run query: {METEO_GEO_URL}?{urlencode(geo_params)}")
 
-        res_geo = req.get(url=METEO_GEO_URL, params=geo_params)
-        res_geo.raise_for_status()  # Raise HTTPError for bad status codes
+        res = req.get(url=METEO_GEO_URL, params=geo_params)
+        res.raise_for_status()  # Raise HTTPError for bad status codes
 
-        geo_data = res_geo.json()
+        data = res.json()
 
         return {
-            "latitude": geo_data["results"][0]["latitude"],
-            "longitude": geo_data["results"][0]["longitude"]
+            "latitude": data["results"][0]["latitude"],
+            "longitude": data["results"][0]["longitude"]
         }
 
     except req.exceptions.RequestException as e:
@@ -67,16 +68,16 @@ def get_weather_for_coords(coords: dict) -> dict:
         }
 
         print(f"About to run query: {METEO_WEATHER_URL}?{urlencode(weather_params)}")
-        res_weather = req.get(METEO_WEATHER_URL, params=weather_params)
-        res_weather.raise_for_status()
+        res = req.get(METEO_WEATHER_URL, params=weather_params)
+        res.raise_for_status()
 
-        weather_data = res_weather.json()
+        data = res.json()
 
         # These are the features we want from the returned weather data
-        time = weather_data["hourly"]["time"]
-        temp = weather_data["hourly"]["temperature_2m"]
-        real_feel = weather_data["hourly"]["apparent_temperature"]
-        rain = weather_data["hourly"]["rain"]
+        time = data["hourly"]["time"]
+        temp = data["hourly"]["temperature_2m"]
+        real_feel = data["hourly"]["apparent_temperature"]
+        rain = data["hourly"]["rain"]
         idx_max_real_feel = real_feel.index(max(real_feel))
         idx_min_real_feel = real_feel.index(min(real_feel))
         idx_max_rain = rain.index(max(rain))
@@ -120,11 +121,56 @@ def get_weather_for_city(city: str) -> dict:
     """
 
     coords = get_coords_for_city(city)
-
     print(f"Latitude: {coords['latitude']}, longitude: {coords['longitude']}")
+    weather = get_weather_for_coords(coords)
+    weather["name"] = city
 
-    return get_weather_for_coords(coords)
+    return weather
 
+def compare_weather(city_1: dict, city_2: dict) -> tuple:
+    """
+    Compare the weather in city_1 and city_2
+    return 1 if city_1 wins, 2 if city_2 wins and 0 for a tie
+    """
+
+    # 20+ is hot
+    if city_1["max_real_feel"] >= 20 or city_2["max_real_feel"] >= 20:
+        if city_1["max_real_feel"] > city_2["max_real_feel"]:
+            return (city_1["name"], "max_real_feel")
+        elif city_2["max_real_feel"] > city_1["max_real_feel"]:
+            return (city_2["name"], "max_real_feel")
+
+    # 10- is cold
+    if city_1["min_real_feel"] <= 10 or city_2["min_real_feel"] <= 10:
+        if city_1["min_real_feel"] < city_2["min_real_feel"]:
+            return (city_1["name"], "min_real_feel")
+        elif city_2["min_real_feel"] < city_1["min_real_feel"]:
+            return (city_2["name"], "min_real_feel")
+
+    # Use rain as a tie breaker
+    if city_1["max_rain"] > 0 or city_1["max_rain"] > 0:
+        if city_1["max_rain"] > city_2["max_rain"]:
+            return (city_1["name"], "max_rain")
+        elif city_2["max_rain"] > city_1["max_rain"]:
+            return (city_2["name"], "max_rain")
+
+    return ("None", "tie")
+
+def create_result_string(city_1: dict, city_2: dict, winning_city: tuple) -> str:
+    result = []
+
+    result.append("Welcome to weather battle!")
+    result.append("\n")
+    result.append("Max temperature")
+    result.append(f"{city_1['name']} : {city_1['max_temp']}{DEGREE} (Real Feel {city_1['max_real_feel']}{DEGREE}) - {city_2['max_temp']}{DEGREE} (Real Feel {city_2['max_real_feel']}{DEGREE}) : {city_2['name']}")
+    result.append("Min temperature")
+    result.append(f"{city_1['name']} : {city_1['min_temp']}{DEGREE} (Real Feel {city_1['min_real_feel']}{DEGREE}) - {city_2['min_temp']}{DEGREE} (Real Feel {city_2['min_real_feel']}{DEGREE}) : {city_2['name']}")
+    result.append("Max rain")
+    result.append(f"{city_1['name']} : {city_1['max_rain']}mm - {city_2['max_rain']}mm : {city_2['name']}")
+    result.append("\n")
+    result.append(f"Winner: {winning_city[0]} on {winning_city[1]}!")
+
+    return ("\n").join(result)
 
 def main():
     """Main function, fetches coords, then weather data for both cities"""
@@ -132,16 +178,10 @@ def main():
     try:
         city_1_weather = get_weather_for_city(CITY_1)
         city_2_weather = get_weather_for_city(CITY_2)
+        winner = compare_weather(city_1_weather, city_2_weather)
+        result = create_result_string (city_1_weather, city_2_weather, winner)
 
-        print(f"{CITY_1} stats")
-        print(f"Highest real feel of the day: {city_1_weather['max_temp']} (real feel {city_1_weather['max_real_feel']}) at {city_1_weather['max_time']}")
-        print(f"Lowest real feel of the day: {city_1_weather['min_temp']} (real feel {city_1_weather['min_real_feel']}) at {city_1_weather['min_time']}")
-        print(f"Highest rainfall of the day: {city_1_weather['max_rain']} at {city_1_weather["rain_time"]}")
-
-        print(f"{CITY_2} stats")
-        print(f"Highest real feel of the day: {city_2_weather['max_temp']} (real feel {city_2_weather['max_real_feel']}) at {city_2_weather['max_time']}")
-        print(f"Lowest real feel of the day: {city_2_weather['min_temp']} (real feel {city_2_weather['min_real_feel']}) at {city_2_weather['min_time']}")
-        print(f"Highest rainfall of the day: {city_2_weather['max_rain']} at {city_2_weather["rain_time"]}")
+        print(result)
 
     except KeyError as e:
         print(f"Error: Key {e} not found in weather response")
