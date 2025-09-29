@@ -51,9 +51,24 @@ def get_coords_for_city(city: str) -> dict:
 
         data = res.json()
 
+        if not data.get("results") or len(data["results"]) == 0:
+            raise ValueError(f"No coordinates returned in API response for {city}")
+
+        required_keys = ["latitude", "longitude"]
+
+        for key in required_keys:
+            if key not in data["results"][0]:
+                raise ValueError(f"Key {key} not found in results data")
+
+        latitude = data["results"][0]["latitude"]
+        longitude = data["results"][0]["longitude"]
+
+        if not latitude or not longitude:
+            raise ValueError("Weather API returned empty latitude or longitude values")
+
         return {
-            "latitude": data["results"][0]["latitude"],
-            "longitude": data["results"][0]["longitude"]
+            "latitude": latitude,
+            "longitude": longitude
         }
 
     except req.exceptions.RequestException as e:
@@ -92,11 +107,28 @@ def get_weather_for_coords(coords: dict) -> dict:
 
         data = res.json()
 
+        # Validate data in response
+        if "hourly" not in data:
+            raise ValueError("Weather API response missing hourly data")
+
+        required_keys = ["time", "temperature_2m", "apparent_temperature", "rain"]
+        for key in required_keys:
+            if key not in data["hourly"]:
+                raise ValueError(f"Key {key} not found in hourly data") 
+
         # These are the features we want from the returned weather data
         time = data["hourly"]["time"]
         temp = data["hourly"]["temperature_2m"]
         real_feel = data["hourly"]["apparent_temperature"]
         rain = data["hourly"]["rain"]
+
+        if not time or not temp or not real_feel or not rain:
+            raise ValueError("Weather API returned empty data array(s)")
+
+        if not (len(time) == len(temp) == len(real_feel) == len(rain)):
+            raise ValueError("Weather data arrays have different lengths")
+
+        # Calculate min and max values for comparison
         idx_max_real_feel = real_feel.index(max(real_feel))
         idx_min_real_feel = real_feel.index(min(real_feel))
         idx_max_rain = rain.index(max(rain))
@@ -178,9 +210,9 @@ def create_result_string(city_1: dict, city_2: dict, winning_city: tuple) -> str
     result.append("Welcome to weather battle!")
     result.append("\n")
     result.append("Max temperature")
-    result.append(f"{city_1['name']} : {city_1['max_temp']}{DEGREE} (Real Feel {city_1['max_real_feel']}{DEGREE}) - {city_2['max_temp']}{DEGREE} (Real Feel {city_2['max_real_feel']}{DEGREE}) : {city_2['name']}")
+    result.append(f"{city_1['name']} : {city_1['max_temp']}{DEGREE}C (Real Feel {city_1['max_real_feel']}{DEGREE}C) - {city_2['max_temp']}{DEGREE}C (Real Feel {city_2['max_real_feel']}{DEGREE}C) : {city_2['name']}")
     result.append("Min temperature")
-    result.append(f"{city_1['name']} : {city_1['min_temp']}{DEGREE} (Real Feel {city_1['min_real_feel']}{DEGREE}) - {city_2['min_temp']}{DEGREE} (Real Feel {city_2['min_real_feel']}{DEGREE}) : {city_2['name']}")
+    result.append(f"{city_1['name']} : {city_1['min_temp']}{DEGREE}C (Real Feel {city_1['min_real_feel']}{DEGREE}C) - {city_2['min_temp']}{DEGREE}C (Real Feel {city_2['min_real_feel']}{DEGREE}C) : {city_2['name']}")
     result.append("Max rain")
     result.append(f"{city_1['name']} : {city_1['max_rain']}mm - {city_2['max_rain']}mm : {city_2['name']}")
     result.append("\n")
