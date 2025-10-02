@@ -32,7 +32,7 @@ class WeatherAPIClient:
                 "end_date": self.today
             }
 
-            print(f"About to run query: {WeatherAPIClient.METEO_WEATHER_URL}?{urlencode(params)}")
+            print(f"About to run weather query for {coords["city"]}: {WeatherAPIClient.METEO_WEATHER_URL}?{urlencode(params)}")
             res = req.get(WeatherAPIClient.METEO_WEATHER_URL, params=params, timeout=self.timeout)
             res.raise_for_status()
 
@@ -66,6 +66,7 @@ class WeatherAPIClient:
 
             # Only the values we want to compare
             return {
+                "name": coords["city"],
                 "max_time": time[idx_max_real_feel].split("T")[1],
                 "max_real_feel": real_feel[idx_max_real_feel],
                 "max_temp": temp[idx_max_real_feel],

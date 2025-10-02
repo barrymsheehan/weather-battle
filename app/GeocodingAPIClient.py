@@ -29,7 +29,8 @@ class GeocodingAPIClient:
                 "language": self.language,
                 "format": self.format
             }
-            print(f"About to run query: {GeocodingAPIClient.METEO_GEO_URL}?{urlencode(params)}")
+
+            print(f"About to run geolocation query for {city}: {GeocodingAPIClient.METEO_GEO_URL}?{urlencode(params)}")
 
             res = req.get(url=GeocodingAPIClient.METEO_GEO_URL, params=params, timeout=self.timeout)
             res.raise_for_status()  # Raise HTTPError for bad status codes
@@ -45,10 +46,12 @@ class GeocodingAPIClient:
                 if key not in data["results"][0]:
                     raise ValueError(f"Key {key} not found in results data")
 
+            city = data["results"][0]["name"]
             latitude = data["results"][0]["latitude"]
             longitude = data["results"][0]["longitude"]
 
             return {
+                "city": city,
                 "latitude": latitude,
                 "longitude": longitude
             }
