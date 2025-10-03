@@ -1,7 +1,7 @@
 import json
 import sys
-from GeocodingAPIClient import GeocodingAPIClient
-from WeatherAPIClient import WeatherAPIClient
+from .GeocodingAPIClient import GeocodingAPIClient
+from .WeatherAPIClient import WeatherAPIClient
 
 DEGREE = chr(176) # degree symbol
 
@@ -11,7 +11,7 @@ def load_config() -> dict:
     global config
 
     try:
-        with open("../config.json", "r") as file:
+        with open("./config.json", "r") as file:
             config = json.load(file)
 
     except FileNotFoundError as e:
